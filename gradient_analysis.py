@@ -11,7 +11,6 @@ from os import path
 from typing import Any, List, Tuple
 import numpy as np
 import pandas as pd
-import scipy.stats as sts
 import loading
 import pre_processing as preproc
 import seaborn as sns
@@ -73,6 +72,8 @@ if __name__ == '__main__':
     burn_in = 5*60*100  # 5-minute burn-in period
 
     mpl.rcParams['pdf.fonttype'] = 42
+    set_journal_style(23, 23)
+    mpl.rcParams['pdf.fonttype'] = 42
 
     a_parser = argparse.ArgumentParser(prog="gradient_analysis",
                                        description="Runs analysis for hot and cold gradient experiments")
@@ -91,7 +92,7 @@ if __name__ == '__main__':
 
     all_exp = {"hot": hot_exp, "cold": cold_exp}
 
-    plot_dir = "KAB_Gradient"
+    plot_dir = "REVISION_KAB_Gradient"
     if not path.exists(plot_dir):
         os.makedirs(plot_dir)
 
@@ -140,6 +141,7 @@ if __name__ == '__main__':
     for k in val_fish:
         for df_fish, df_bout in zip(val_fish[k], val_bouts[k]):
             temp_pref["Treatment"].append(k)
+            temp_distribution["Treatment"].append(k)
             temps = df_fish['Temperature'][burn_in:]
             temps = temps[np.isfinite(temps)]
             temp_pref["Avg. temperature [C]"].append(np.nanmean(temps))
@@ -153,28 +155,17 @@ if __name__ == '__main__':
 
     order = ["hot", "cold"]
 
-    fig, (ax_mean, ax_median) = pl.subplots(ncols=2)
-    sns.boxplot(data=df_temp_pref, x="Treatment", y="Avg. temperature [C]", ax=ax_mean, order=order)
-    sns.stripplot(x="Treatment", y="Avg. temperature [C]", data=df_temp_pref, color='k', alpha=0.3, ax=ax_mean,
-                  order=order)
-    sns.boxplot(data=df_temp_pref, x="Treatment", y="Median temperature [C]", ax=ax_median,
-                order=order)
-    sns.stripplot(x="Treatment", y="Median temperature [C]", data=df_temp_pref, color='k', alpha=0.3, ax=ax_median,
-                  order=order)
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "Temperature_preference.pdf"))
-
-    fig, ax = pl.subplots()
-    sns.barplot(data=df_temp_pref, x="Treatment", y="Median temperature [C]", ax=ax, order=order,
-                estimator=np.var, errorbar=('ci', 68))
-    pl.ylabel("Preference variance [C**2]")
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "InterFishVariance.pdf"))
-
     # plot temperature distribution densities with bootstrap statistics
+    df_temp_dist_hot = df_temp_distribution[df_temp_distribution["Treatment"] == "hot"]
+    df_temp_dist_cold = df_temp_distribution[df_temp_distribution["Treatment"] == "cold"]
 
-    fig = pf.lineplot(df_temp_distribution, "Density", "Treatment", temp_oc_bc, "Temperature [C]", occupancy)
-    fig.savefig(path.join(plot_dir, "F1_Occupancy.pdf"))
+    fig = pf.lineplot(df_temp_dist_hot, "Density", "Treatment", temp_oc_bc, "Temperature [C]", occupancy, add_marker=True)
+    pl.xlim(24, 32)
+    fig.savefig(path.join(plot_dir, "REVISION_1F_Occupancy_Hot.pdf"))
+
+    fig = pf.lineplot(df_temp_dist_cold, "Density", "Treatment", temp_oc_bc, "Temperature [C]", occupancy, add_marker=True)
+    pl.xlim(18, 26)
+    fig.savefig(path.join(plot_dir, "REVISION_1G_Occupancy_Cold.pdf"))
 
     # analyze bout features by temperature
     temp_bins = np.linspace(18, 32, 29)
@@ -201,8 +192,9 @@ if __name__ == '__main__':
     df_temp_aln_distribution = pd.DataFrame(temp_aln_distribution)
 
     fig = pf.lineplot(df_temp_aln_distribution, "Gradient alignment", "Treatment", temp_bincents, "Temperature [C]",
-                      np.nanmean)
-    fig.savefig(path.join(plot_dir, "F3_Gradient_alignment_by_temperature.pdf"))
+                      np.nanmean, add_marker=True)
+    pl.plot([temp_bincents[0], temp_bincents[-1]], [0.64, 0.64], 'k--')  # expected alignment
+    fig.savefig(path.join(plot_dir, "REVISION_2E_Gradient_alignment_by_temperature.pdf"))
 
     trajectories = {}
     for k in val_bouts:
@@ -251,25 +243,6 @@ if __name__ == '__main__':
     m_neg_res = np.nanmean(neg_res_bs, axis=0)
     e_neg_res = np.nanstd(neg_res_bs, axis=0)
 
-    fig = pl.figure()
-    pl.fill_between(temp_bincents, m_pos_res-e_pos_res, m_pos_res+e_pos_res, alpha=0.3, color="C0")
-    pl.plot(temp_bincents, m_pos_res, label="Reversal after facing cold", color="C0")
-    pl.fill_between(temp_bincents, m_neg_res-e_neg_res, m_neg_res+e_neg_res, alpha=0.3, color="C3")
-    pl.plot(temp_bincents, m_neg_res, label="Reversal after facing hot", color="C3")
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Avg. length until reversal")
-    pl.legend()
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "Reversal_trajectory_length.pdf"))
-
-    fig = pl.figure()
-    pl.plot(temp_bincents, (m_neg_res - m_pos_res) / (m_neg_res + m_pos_res))
-    pl.plot(temp_bincents, np.zeros(temp_bincents.size), 'k--')
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Hot reversal length preference")
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "Reversal_trajectory_PI.pdf"))
-
     fig, axes = pl.subplots(ncols=2, sharey=True, figsize=(6.4*2, 4.8*2))
     cmap = pl.colormaps["viridis_r"]
     time_colors = cmap(np.linspace(0, 1, 40))
@@ -290,7 +263,7 @@ if __name__ == '__main__':
     axes[0].set_title("Cold going trajectories")
     axes[1].set_title("Hot going trajectories")
     fig.suptitle('19<=T>=22')
-    fig.savefig(path.join(plot_dir, "F3_Trajectories_from_cold.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_2I_Trajectories_from_cold.pdf"))
 
     fig, axes = pl.subplots(ncols=2, sharey=True, figsize=(6.4*2, 4.8*2))
     cmap = pl.colormaps["viridis_r"]
@@ -312,7 +285,7 @@ if __name__ == '__main__':
     axes[0].set_title("Cold going trajectories")
     axes[1].set_title("Hot going trajectories")
     fig.suptitle('28<=T>=31')
-    fig.savefig(path.join(plot_dir, "F3_Trajectories_from_hot.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_2I_Trajectories_from_hot.pdf"))
 
     fig, axes = pl.subplots(ncols=2, sharey=True, figsize=(6.4*2, 4.8*2))
     cmap = pl.colormaps["viridis_r"]
@@ -334,12 +307,12 @@ if __name__ == '__main__':
     axes[0].set_title("Cold going trajectories")
     axes[1].set_title("Hot going trajectories")
     fig.suptitle('24<=T>=28')
-    fig.savefig(path.join(plot_dir, "F3_Trajectories_from_pref.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_2I_Trajectories_from_pref.pdf"))
 
     fig, ax = pl.subplots(figsize=(1, 6), layout='constrained')
     norm = mpl.colors.Normalize(vmin=0, vmax=25)
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap), cax=ax, orientation='vertical', label="Trajectory length [bouts]")
-    fig.savefig(path.join(plot_dir, "F3_Trajectories_color_scale.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_2I_Trajectories_color_scale.pdf"))
 
     ###################################################################################################################
     # Length of actual reversals
@@ -384,17 +357,33 @@ if __name__ == '__main__':
     m_hot = np.nanmean(hot_bs, axis=0)
     e_hot = np.nanstd(hot_bs, axis=0)
 
-
+    p_vals = utils.compute_weighted_histogram_p([face_colder_reversals[:, 0], face_hotter_reversals[:, 0]], temp_bins,
+                                                [face_colder_reversals[:, 2], face_hotter_reversals[:, 2]],
+                                                10_000)
+    max_y = max(np.max(m_cold), np.max(m_hot))
     fig = pl.figure()
     pl.fill_between(temp_bincents, m_cold-e_cold, m_cold+e_cold, alpha=0.3, color="C0")
-    pl.plot(temp_bincents, m_cold, label="Facing cold before reversal", color="C0")
+    pl.plot(temp_bincents, m_cold, label="Facing cold", color="C0", marker='.')
     pl.fill_between(temp_bincents, m_hot - e_hot, m_hot + e_hot, alpha=0.3, color="C3")
-    pl.plot(temp_bincents, m_hot, label="Facing hot before reversal", color="C3")
+    pl.plot(temp_bincents, m_hot, label="Facing hot", color="C3", marker='.')
+    # plot p-value indicators
+    for pv, xv in zip(p_vals, temp_bincents):
+        if pv >= 0.05:
+            marker = '.'
+        elif pv >= 0.01:
+            marker = '+'
+        elif pv >= 0.001:
+            marker = 'x'
+        elif np.isfinite(pv):
+            marker = '*'
+        else:
+            marker = "None"
+        pl.scatter(xv, max_y, marker=marker, color='k')
     pl.xlabel("Temperature [C]")
     pl.ylabel("Avg. reversal length")
     pl.legend()
     sns.despine()
-    fig.savefig(path.join(plot_dir, "F3_Bouts_per_reversal.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_S2C_Bouts_per_reversal_BootTest.pdf"))
 
     cold_bs = utils.bootstrap_weighted_histogram_avg(face_colder_reversals[:, 0], temp_bins, face_colder_reversals[:, 4], 1000)
     m_cold = np.nanmean(cold_bs, axis=0)
@@ -403,152 +392,16 @@ if __name__ == '__main__':
     m_hot = np.nanmean(hot_bs, axis=0)
     e_hot = np.nanstd(hot_bs, axis=0)
 
-    set_journal_style()
-    fig, ax = pl.subplots()
+    fig, ax = pl.subplots()  # no p-values calculated since curves overlap
     pl.fill_between(temp_bincents, m_cold - e_cold, m_cold + e_cold, alpha=0.3, color="C0")
-    pl.plot(temp_bincents, m_cold, label="Facing cold before reversal", color="C0")
+    pl.plot(temp_bincents, m_cold, label="Facing cold", color="C0", marker='.')
     pl.fill_between(temp_bincents, m_hot - e_hot, m_hot + e_hot, alpha=0.3, color="C3")
-    pl.plot(temp_bincents, m_hot, label="Facing hot before reversal", color="C3")
+    pl.plot(temp_bincents, m_hot, label="Facing hot", color="C3", marker='.')
     pl.xlabel("Temperature [C]")
     pl.ylabel("Avg. handedness")
     pl.legend()
     remove_spines(ax)
-    fig.savefig(path.join(plot_dir, "S3_Average_handedness_in_reversal.pdf"))
-
-    cold_bs = utils.bootstrap_weighted_histogram_avg(face_colder_reversals[:, 0], temp_bins, face_colder_reversals[:, 3], 1000)
-    m_cold = np.nanmean(cold_bs, axis=0)
-    e_cold = np.nanstd(cold_bs, axis=0)
-    hot_bs = utils.bootstrap_weighted_histogram_avg(face_hotter_reversals[:, 0], temp_bins, face_hotter_reversals[:, 3], 1000)
-    m_hot = np.nanmean(hot_bs, axis=0)
-    e_hot = np.nanstd(hot_bs, axis=0)
-
-    fig = pl.figure()
-    pl.fill_between(temp_bincents, m_cold - e_cold, m_cold + e_cold, alpha=0.3, color="C0")
-    pl.plot(temp_bincents, m_cold, label="Facing cold before reversal", color="C0")
-    pl.fill_between(temp_bincents, m_hot - e_hot, m_hot + e_hot, alpha=0.3, color="C3")
-    pl.plot(temp_bincents, m_hot, label="Facing hot before reversal", color="C3")
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Avg. magnitude [deg]")
-    pl.legend()
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "Average_CosineChange_Magnitude_in_reversal.pdf"))
-
-    ###################################################################################################################
-    # Reversal maneuver initiation probabilities
-    ###################################################################################################################
-
-    # for different temperatures compute the probability of initiating a quick reversal maneuver
-    # the maximal length of direction change for the maneuver still be called a "reversal"
-    # How to set? Median length=5; 90th percentile = 10; currently six is the smallest amount where
-    # we still have at least one true reversal in each bin
-    true_hot_reversals = face_hotter_reversals[face_hotter_reversals[:, 2] <= max_reversal_length, :]
-    true_cold_reversals = face_colder_reversals[face_colder_reversals[:, 2] <= max_reversal_length, :]
-
-    all_aligned = []  # characteristics of bouts that are considered aligned to the gradient
-
-    for k in trajectories:
-        for t in trajectories[k]:
-            temperatures = np.array(t["Temperature"])
-            grad_dirs = np.array(t["Gradient direction"])
-            aligned = np.logical_or(grad_dirs < -align_thresh, grad_dirs > align_thresh)
-            all_aligned.append(np.c_[temperatures[aligned][:, None], grad_dirs[aligned][:, None]])
-    all_aligned = np.vstack(all_aligned)
-
-    # for each temperature bin, plot the fraction of reversal trajectories when cold- or hot-facing in relation
-    # to the total number of in-trajectory bouts that are cold- or hot-facing
-    h_rev_cold = np.histogram(true_cold_reversals[:, 0], bins=temp_bins)[0]
-    h_aln_cold = np.histogram(all_aligned[all_aligned[:, 1] > 0][:, 0], bins=temp_bins)[0]
-
-    h_rev_hot = np.histogram(true_hot_reversals[:, 0], bins=temp_bins)[0]
-    h_aln_hot = np.histogram(all_aligned[all_aligned[:, 1] < 0][:, 0], bins=temp_bins)[0]
-
-    fig = pl.figure()
-    ci = [sts.binomtest(h_rev_cold[i], h_aln_cold[i]).proportion_ci(confidence_level=0.68) for i in
-          range(temp_bincents.size)]
-    upper = np.hstack([ci[i].high for i in range(temp_bincents.size)])
-    lower = np.hstack([ci[i].low for i in range(temp_bincents.size)])
-    pl.fill_between(temp_bincents, upper, lower, alpha=0.2, color="C0")
-    pl.plot(temp_bincents, h_rev_cold / h_aln_cold, label="Facing cold", color="C0")
-    ci = [sts.binomtest(h_rev_hot[i], h_aln_hot[i]).proportion_ci(confidence_level=0.68) for i in
-          range(temp_bincents.size)]
-    upper = np.hstack([ci[i].high for i in range(temp_bincents.size)])
-    lower = np.hstack([ci[i].low for i in range(temp_bincents.size)])
-    pl.fill_between(temp_bincents, upper, lower, alpha=0.2, color="C1")
-    pl.plot(temp_bincents, h_rev_hot / h_aln_hot, label="Facing hot", color="C1")
-    sns.despine()
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Reversal probability")
-    pl.legend()
-    fig.savefig(path.join(plot_dir, "F3_Reversal_probabilities.pdf"))
-
-    all_p = np.full(temp_bincents.size, np.nan)
-    for i in range(temp_bincents.size):
-        all_p[i] = sts.binomtest(h_rev_hot[i], h_aln_hot[i], p=h_rev_cold[i] / h_aln_cold[i]).pvalue
-    fig = pl.figure()
-    pl.plot(temp_bincents, all_p)
-    # Bonferroni corrected p=0.05 cutoff
-    pl.plot(temp_bincents, np.ones(temp_bincents.size) * 0.05 / temp_bincents.size, 'k--')
-    pl.plot(temp_bincents, np.ones(temp_bincents.size) * 0.01 / temp_bincents.size, 'k:')
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("p value (H is hot=cold)")
-    sns.despine()
-    pl.yscale("log")
-    fig.savefig(path.join(plot_dir, "HotvsColdFacingReversal_p_values.pdf"))
-
-    fig = pl.figure()
-    pl.plot(temp_bincents, (h_rev_cold/h_aln_cold - h_rev_hot/h_aln_hot) / (h_rev_cold/h_aln_cold + h_rev_hot/h_aln_hot))
-    pl.plot(temp_bincents, np.zeros(temp_bincents.size), 'k--')
-    sns.despine()
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Cold reversal preference")
-    fig.savefig(path.join(plot_dir, "Cold_reversal_preference.pdf"))
-
-    ###################################################################################################################
-    # Aligned trajectory persistence length
-    ###################################################################################################################
-
-    persistent_trajectories = []
-    for k in trajectories:
-        for t in trajectories[k]:
-            persistent_trajectories += utils.split_persistent_trajectories(t, align_thresh)
-
-    pers_info = []
-    for pt in persistent_trajectories:
-        t = np.array(pt["Temperature"])[0]
-        gd = np.array(pt["Gradient direction"])[0]
-        ln = pt.shape[0]
-        pers_info.append(np.r_[t, gd, ln])
-    pers_info = np.vstack(pers_info)
-    # persistence in the positive direction (twds. inc. y), i.e. decreasing temperature
-    face_colder_pers = pers_info[pers_info[:, 1] > 0]
-    # persistence in the negative direction (twds. dec. y), i.e. increasing temperature
-    face_hotter_pers = pers_info[pers_info[:, 1] < 0]
-
-    f_cold_p_bs = utils.bootstrap_weighted_histogram_avg(face_colder_pers[:, 0], temp_bins, face_colder_pers[:, 2], 1000)
-    m_cold_p = np.nanmean(f_cold_p_bs, axis=0)
-    e_cold_p = np.nanstd(f_cold_p_bs, axis=0)
-    f_hot_p_bs = utils.bootstrap_weighted_histogram_avg(face_hotter_pers[:, 0], temp_bins, face_hotter_pers[:, 2], 1000)
-    m_hot_p = np.nanmean(f_hot_p_bs, axis=0)
-    e_hot_p = np.nanstd(f_hot_p_bs, axis=0)
-
-    fig = pl.figure()
-    pl.fill_between(temp_bincents, m_cold_p-e_cold_p, m_cold_p+e_cold_p, alpha=0.3, color="C0")
-    pl.plot(temp_bincents, m_cold_p, label="Persistence facing cold", color="C0")
-    pl.fill_between(temp_bincents, m_hot_p-e_hot_p, m_hot_p+e_hot_p, alpha=0.3, color="C3")
-    pl.plot(temp_bincents, m_hot_p, label="Persistence facing hot", color="C3")
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Avg. persistence length")
-    pl.legend()
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "F3_Persistence_trajectory_length.pdf"))
-
-    fig = pl.figure()
-    pl.plot(temp_bincents, (m_hot_p - m_cold_p)/(m_hot_p + m_cold_p))
-    pl.plot(temp_bincents, np.zeros(temp_bincents.size), 'k--')
-    pl.xlabel("Temperature [C]")
-    pl.ylabel("Warm persistence preference")
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "Persistence_preference.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_S2D_Average_handedness_in_reversal.pdf"))
 
     # augment bouts with reversal information and save fish and bout dataframes
     for k in val_bouts:

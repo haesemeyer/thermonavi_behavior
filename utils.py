@@ -72,6 +72,41 @@ def bootstrap_weighted_histogram_avg(bin_data: np.ndarray, bins: np.ndarray, wei
     return variates
 
 
+def compute_weighted_histogram_p(bin_data: List[np.ndarray], bins: np.ndarray, weights: List[np.ndarray], n_boot:int) -> np.ndarray:
+    """
+    Uses bootstrap test to compute Bonferroni corrected p-values for each bin in a weighted histogram comparison
+    :param bin_data: 2-element list with the data for each broup by which to bin
+    :param bins: The bin boundaries
+    :param weights: 2-element list of each group's weights, i.e. the data that will be averaged in each bin
+    :param n_boot: The number of bootstrap variates to create
+    :return: n_bins-1 long vector of bootstrap permutation p-values
+    """
+    def weighted_hist(data, bins, wts):
+        wh = np.histogram(data, bins=bins, weights=wts)[0].astype(float)
+        ch = np.histogram(data, bins=bins)[0].astype(float)
+        return wh/ch
+
+    if len(bin_data) != 2 or len(weights) != 2:
+        raise ValueError("bin_data and weights have to be 2-element lists with the respective data of each group")
+    g1_weighted = weighted_hist(bin_data[0], bins, weights[0])
+    g2_weighted = weighted_hist(bin_data[1], bins, weights[1])
+    true_diff = np.abs(g1_weighted - g2_weighted)
+    variate_diffs = np.full((n_boot, g1_weighted.size), np.nan)
+    combined_bin_data = np.hstack(bin_data)
+    combined_weights = np.hstack(weights)
+    combined_indices = np.arange(combined_bin_data.size).astype(int)
+    cnt_1 = bin_data[0].size
+    for i in range(n_boot):
+        np.random.shuffle(combined_indices)  # NOTE: We use this indirection since we need to shuffle data and weights while keeping the pairing
+        var_data = combined_bin_data[combined_indices]
+        var_weights = combined_weights[combined_indices]
+        g1_var = weighted_hist(var_data[:cnt_1], bins, var_weights[:cnt_1])
+        g2_var = weighted_hist(var_data[cnt_1:], bins, var_weights[cnt_1:])
+        variate_diffs[i, :] = np.abs(g1_var - g2_var)
+    p_vals = np.array([np.sum(variate_diffs[:, i] >= true_diff[i])/n_boot for i in range(g1_weighted.size)])
+    return p_vals * p_vals.size  # Bonferroni correction
+
+
 def edge_filter_bouts(chamber: ChamberEstimate, edge_distance: float, bout_data: pd.DataFrame,
                       fish_data: pd.DataFrame) -> pd.DataFrame:
     """
@@ -112,7 +147,7 @@ def collect_trajectories(df: pd.DataFrame, frame_rate=100, n_seconds=2):
     return traj_list
 
 
-def find_all_pickle_paths(root_f: str) -> List[str]:
+def find_all_bout_pickle_paths(root_f: str) -> List[str]:
     """
     Recursively searches for pandas pickle files identified by their .pk extension
     :param root_f: The folder from which to start the current search
@@ -126,7 +161,26 @@ def find_all_pickle_paths(root_f: str) -> List[str]:
     dir_local = [path.join(root_f, o) for o in objects if path.isdir(path.join(root_f, o))]
     exp_deep = []
     for dl in dir_local:
-        e_deep = find_all_pickle_paths(dl)
+        e_deep = find_all_bout_pickle_paths(dl)
+        exp_deep += e_deep
+    return exp_local + exp_deep
+
+
+def find_all_fish_pickle_paths(root_f: str) -> List[str]:
+    """
+    Recursively searches for pandas pickle files identified by their .pk extension
+    :param root_f: The folder from which to start the current search
+    :return: List of all .pk files at and below root_f with their full path
+    """
+    try:
+        objects = os.listdir(root_f)
+    except PermissionError:
+        return []
+    exp_local = [path.join(root_f, o) for o in objects if ".pk" in o and "fish" in o and "bout" not in o]
+    dir_local = [path.join(root_f, o) for o in objects if path.isdir(path.join(root_f, o))]
+    exp_deep = []
+    for dl in dir_local:
+        e_deep = find_all_bout_pickle_paths(dl)
         exp_deep += e_deep
     return exp_local + exp_deep
 
@@ -138,7 +192,7 @@ def load_all_trajectories(folder: str, len_thresh=3) -> List[pd.DataFrame]:
     :param len_thresh: Remove all trajectories with a length less than this value
     :return: Aggregated list of all trajectories
     """
-    pickle_files = find_all_pickle_paths(folder)
+    pickle_files = find_all_bout_pickle_paths(folder)
     pickle_files = sorted(pickle_files)
     trajectories = []
     for fishid, pf in enumerate(pickle_files):
@@ -160,6 +214,21 @@ def load_all_trajectories(folder: str, len_thresh=3) -> List[pd.DataFrame]:
         possibles = collect_trajectories(df)
         trajectories += [p for p in possibles if p.shape[0] >= len_thresh]
     return trajectories
+
+
+def load_all_fish_data(folder: str) -> List[pd.DataFrame]:
+    """
+    Load all fish data from pickle files in the given folder
+    :param folder: The folder to search for files
+    :return: List of fish dataframes
+    """
+    pickle_files = find_all_fish_pickle_paths(folder)
+    pickle_files = sorted(pickle_files)
+    fish_data = []
+    for pf in pickle_files:
+        df = pd.read_pickle(pf)
+        fish_data.append(df)
+    return fish_data
 
 
 def split_reversal_trajectories(trajectory: pd.DataFrame, aln_thresh: float) -> List:

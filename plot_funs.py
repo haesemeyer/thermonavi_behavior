@@ -22,7 +22,7 @@ def overview_plot(fish: pd.DataFrame, bouts: pd.DataFrame, ename: str, save_coun
 
 
 def lineplot(data: pd.DataFrame, y: str, hue: Optional[str], x: np.ndarray, x_name: str, boot_fun: np.mean, nboot=1000,
-             line_args: Optional[Dict] = None, shade_args: Optional[Dict] = None) -> pl.Figure:
+             line_args: Optional[Dict] = None, shade_args: Optional[Dict] = None, add_marker=False) -> pl.Figure:
     """
     Seaborn style lineplot function that does not require x-values to be within the dataframe
     :param data: Dataframe with the plot-data
@@ -34,6 +34,7 @@ def lineplot(data: pd.DataFrame, y: str, hue: Optional[str], x: np.ndarray, x_na
     :param nboot: The number of bootstrap samples to generate
     :param line_args: Additional keyword arguments for the boot-average lineplot
     :param shade_args: Additional keyword arguments for the boot-error shading
+    :param add_marker: If set each bin center will be marked
     :return: The generated figure object
     """
     if shade_args is None:
@@ -60,9 +61,9 @@ def lineplot(data: pd.DataFrame, y: str, hue: Optional[str], x: np.ndarray, x_na
         else:
             pl.fill_between(x, m - e, m + e, **shade_args)
         if 'color' not in line_args:
-            pl.plot(x, m, f"C{i}", label=h, **line_args)
+            pl.plot(x, m, f"C{i}", label=h, marker='.' if add_marker else "None", **line_args)
         else:
-            pl.plot(x, m, label=h, **line_args)
+            pl.plot(x, m, label=h, marker='.' if add_marker else "None", **line_args)
     pl.xlabel(x_name)
     pl.ylabel(f"{y} +/- se")
     pl.legend()

@@ -11,11 +11,10 @@ from os import path
 import numpy as np
 import pandas as pd
 import loading
-import seaborn as sns
 import plot_funs as pf
 import utils
 from gradient_analysis import load_all, CheckArgs
-from gradient_analysis import max_reversal_length, align_thresh
+from gradient_analysis import align_thresh, max_reversal_length
 from utils import occupancy
 from plot_funs import set_journal_style
 
@@ -25,6 +24,7 @@ if __name__ == '__main__':
 
     mpl.rcParams['pdf.fonttype'] = 42
     set_journal_style(23, 23)
+    mpl.rcParams['pdf.fonttype'] = 42
 
     a_parser = argparse.ArgumentParser(prog="constant_temp_analysis",
                                        description="Runs analysis for constant temperature experiments")
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     for cf in c_folders:
         all_exp[cf] = loading.find_all_exp_paths(path.join(const_root, cf))[0]
 
-    plot_dir = "KAB_Constant"
+    plot_dir = "REVISION_KAB_Constant"
     if not path.exists(plot_dir):
         os.makedirs(plot_dir)
 
@@ -142,29 +142,24 @@ if __name__ == '__main__':
     df_ibi_distribution = pd.DataFrame(ibi_distribution)
     df_align_pref = pd.DataFrame(align_pref)
 
-    fig, ax = pl.subplots()
-    sns.pointplot(data=df_align_pref, x="Treatment", y="Gradient alignment", ax=ax, order=order)
-    sns.despine()
-    fig.savefig(path.join(plot_dir, "S3_Const_Alignment_by_temp.pdf"))
-
     # plot y-coordinate distribution densities with bootstrap statistics
-    fig = pf.lineplot(df_y_distribution, "Density", None, y_bc, "Y Position [mm]", occupancy)
+    fig = pf.lineplot(df_y_distribution, "Density", None, y_bc, "Y Position [mm]", occupancy, add_marker=True)
     pl.ylim(0)
-    fig.savefig(path.join(plot_dir, "S1_ConstExp_Occupancy.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_S1A_ConstExp_Occupancy.pdf"))
 
     # plot bout feature distribution densities with bootstrap statistics
     fig = pf.lineplot(df_disp_distribution, "Density", "Treatment", disp_bc, "Displacement [mm]", np.mean)
-    fig.savefig(path.join(plot_dir, "Displacement.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_1C_DisplacementDistribution.pdf"))
 
     # plot bout turn angle distribution densities with bootstrap statistics
     fig = pf.lineplot(df_angle_distribution, "Density", "Treatment", angle_bc, "Turn angle [deg]", np.mean)
     pl.plot([-10, -10], [0, 0.05], 'k--')
     pl.plot([10, 10], [0, 0.05], 'k--')
-    fig.savefig(path.join(plot_dir, "TurnAngle.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_1E_TurnAngleDistribution.pdf"))
 
     # plot interbout interval distribution densities with bootstrap statistics
     fig = pf.lineplot(df_ibi_distribution, "Density", "Treatment", ibi_bc, "Interbout interval [ms]", np.mean)
-    fig.savefig(path.join(plot_dir, "InterboutInterval.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_1D_InterboutIntervalDistribution.pdf"))
 
     trajectories = {}
     for k in val_bouts:
@@ -220,7 +215,7 @@ if __name__ == '__main__':
     axes[0].set_title("Cold going trajectories")
     axes[1].set_title("Hot going trajectories")
     fig.suptitle('25 mm<=Y>=100 mm')
-    fig.savefig(path.join(plot_dir, "S3_Trajectories_from_front.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_S2F_Trajectories_from_front.pdf"))
 
     fig, axes = pl.subplots(ncols=2, sharey=True, figsize=(6.4*2, 4.8*2))
     cmap = pl.colormaps["viridis_r"]
@@ -243,4 +238,4 @@ if __name__ == '__main__':
     axes[0].set_title("Cold going trajectories")
     axes[1].set_title("Hot going trajectories")
     fig.suptitle('100 mm<=Y>=175 mm')
-    fig.savefig(path.join(plot_dir, "S3_Trajectories_from_back.pdf"))
+    fig.savefig(path.join(plot_dir, "REVISION_S2F_Trajectories_from_back.pdf"))

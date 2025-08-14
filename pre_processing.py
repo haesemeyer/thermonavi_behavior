@@ -152,10 +152,14 @@ def find_bout_start_end_by_peak(instant_speed: np.ndarray, spd_thresh: float, pk
                 break
         starts[i] = s
         ends[i] = e
+    # TODO: if the first bout start is after the first end, remove the first end
+
     # identify cases where the start of the next bout has been placed before the end of the previous bout (negative IBI)
     ibi = np.r_[0, starts[1:] - ends[:-1]]
     ix_neg = np.where(ibi <= 0)[0]
     for ix in ix_neg:
+        # TODO: Apparently ix_neg can contain 0 which is rather bizarre (since there cannot be a bout before the first)
+        #   this needs to be excluded from alteration
         starts[ix] = ends[ix-1] + 1  # set the start of this bout to one frame after the previous bout ends
     # remove any pairs that have a -1 as this indicates that no valid value was found, also remove pairs in which the
     # length is now below 0 due to the fix above
